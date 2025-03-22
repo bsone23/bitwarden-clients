@@ -43,7 +43,7 @@
       "19": "images/icon19.png",
       "38": "images/icon38.png"
     },
-    "default_title": "Bitwarden",
+    "default_title": "My Bitwarden",
     "default_popup": "popup/index.html"
   },
   "permissions": [
