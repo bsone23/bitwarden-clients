@@ -33,6 +33,15 @@ export default class WebRequestBackground {
           }
           return;
         }
+
+        if (!details.challenger.host.endsWith('.home')) {
+          console.log('Ignoring http auth request');
+          if (callback) {
+            callback(null);
+          }
+          return;
+        }
+
         this.pendingAuthRequests.add(details.requestId);
         if (this.isFirefox) {
           // eslint-disable-next-line
