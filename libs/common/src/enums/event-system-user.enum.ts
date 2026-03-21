@@ -1,6 +1,2 @@
-// Note: the enum key is used to describe the EventSystemUser in the UI. Be careful about changing it.
-export enum EventSystemUser {
-  SCIM = 1,
-  DomainVerification = 2,
-  PublicApi = 3,
-}
+// Re-export from new location for backward compatibility
+export * from "../dirt/event-logs/enums/event-system-user.enum";

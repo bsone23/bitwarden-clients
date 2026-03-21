@@ -52,7 +52,7 @@ foreach ($subBuildPath in $subBuildPaths) {
                 "--verbose",
                 "--force",
                 "--sign",
-                "4B9662CAB74E8E4F4ECBDD9EDEF2543659D95E3C",
+                "A579B6AE496B360642D05B8AB1B650C1B143B770",
                 "--entitlements",
                 $entitlementsPath
             )
@@ -64,7 +64,7 @@ foreach ($subBuildPath in $subBuildPaths) {
                 "-o",
                 "runtime",
                 "--sign",
-                '"Developer ID Application: 8bit Solutions LLC"',
+                '"Developer ID Application: Bitwarden Inc"',
                 "--entitlements",
                 $entitlementsPath
             )

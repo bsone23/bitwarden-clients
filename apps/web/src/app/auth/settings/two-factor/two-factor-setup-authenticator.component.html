@@ -41,7 +41,7 @@
           {{ "twoStepAuthenticatorInstructionSuffix" | i18n }}
         </p>
 
-        <p class="text-center">
+        <p class="tw-text-center">
           <a
             href="https://apps.apple.com/ca/app/bitwarden-authenticator/id6497335175"
             target="_blank"
@@ -73,7 +73,7 @@
       <hr *ngIf="enabled" />
       <p class="tw-text-center tw-mb-0">
         <ng-container *ngIf="qrScriptError" class="tw-mt-2">
-          <i class="bwi bwi-error tw-text-3xl tw-text-danger" aria-hidden="true"></i>
+          <bit-icon name="bwi-error" class="tw-text-3xl tw-text-danger"></bit-icon>
           <p>
             {{ "twoStepAuthenticatorQRCanvasError" | i18n }}
           </p>

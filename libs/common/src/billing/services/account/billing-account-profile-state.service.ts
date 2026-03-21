@@ -1,13 +1,12 @@
-import { map, Observable, combineLatest, concatMap } from "rxjs";
+import { map, Observable } from "rxjs";
 
-import { ApiService } from "../../../abstractions/api.service";
-import { PlatformUtilsService } from "../../../platform/abstractions/platform-utils.service";
-import { BILLING_DISK, StateProvider, UserKeyDefinition } from "../../../platform/state";
-import { UserId } from "../../../types/guid";
 import {
   BillingAccountProfile,
   BillingAccountProfileStateService,
-} from "../../abstractions/account/billing-account-profile-state.service";
+} from "@bitwarden/common/billing/abstractions";
+import { BILLING_DISK, StateProvider, UserKeyDefinition } from "@bitwarden/state";
+
+import { UserId } from "../../../types/guid";
 
 export const BILLING_ACCOUNT_PROFILE_KEY_DEFINITION = new UserKeyDefinition<BillingAccountProfile>(
   BILLING_DISK,
@@ -19,11 +18,7 @@ export const BILLING_ACCOUNT_PROFILE_KEY_DEFINITION = new UserKeyDefinition<Bill
 );
 
 export class DefaultBillingAccountProfileStateService implements BillingAccountProfileStateService {
-  constructor(
-    private readonly stateProvider: StateProvider,
-    private readonly platformUtilsService: PlatformUtilsService,
-    private readonly apiService: ApiService,
-  ) {}
+  constructor(private readonly stateProvider: StateProvider) {}
 
   hasPremiumFromAnyOrganization$(userId: UserId): Observable<boolean> {
     return this.stateProvider
@@ -54,30 +49,19 @@ export class DefaultBillingAccountProfileStateService implements BillingAccountP
     hasPremiumFromAnyOrganization: boolean,
     userId: UserId,
   ): Promise<void> {
-    await this.stateProvider.getUser(userId, BILLING_ACCOUNT_PROFILE_KEY_DEFINITION).update((_) => {
-      return {
-        hasPremiumPersonally: hasPremiumPersonally,
-        hasPremiumFromAnyOrganization: hasPremiumFromAnyOrganization,
-      };
-    });
-  }
-
-  canViewSubscription$(userId: UserId): Observable<boolean> {
-    return combineLatest([
-      this.hasPremiumPersonally$(userId),
-      this.hasPremiumFromAnyOrganization$(userId),
-    ]).pipe(
-      concatMap(async ([hasPremiumPersonally, hasPremiumFromOrg]) => {
-        const isCloud = !this.platformUtilsService.isSelfHost();
-
-        let billing = null;
-        if (isCloud) {
-          billing = await this.apiService.getUserBillingHistory();
-        }
-
-        const cloudAndBillingHistory = isCloud && !billing?.hasNoHistory;
-        return hasPremiumPersonally || !hasPremiumFromOrg || cloudAndBillingHistory;
-      }),
+    await this.stateProvider.getUser(userId, BILLING_ACCOUNT_PROFILE_KEY_DEFINITION).update(
+      (_) => {
+        return {
+          hasPremiumPersonally: hasPremiumPersonally,
+          hasPremiumFromAnyOrganization: hasPremiumFromAnyOrganization,
+        };
+      },
+      {
+        shouldUpdate: (state) =>
+          state == null ||
+          state.hasPremiumFromAnyOrganization !== hasPremiumFromAnyOrganization ||
+          state.hasPremiumPersonally !== hasPremiumPersonally,
+      },
     );
   }
 }

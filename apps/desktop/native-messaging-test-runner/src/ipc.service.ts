@@ -13,8 +13,10 @@ import { race } from "./race";
 
 const DEFAULT_MESSAGE_TIMEOUT = 10 * 1000; // 10 seconds
 
-export type MessageHandler = (MessageCommon) => void;
+export type MessageHandler = (message: MessageCommon) => void;
 
+// FIXME: update to use a const object instead of a typescript enum
+// eslint-disable-next-line @bitwarden/platform/no-enums
 export enum IPCConnectionState {
   Disconnected = "disconnected",
   Connecting = "connecting",

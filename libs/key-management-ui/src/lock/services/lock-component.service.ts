@@ -10,6 +10,7 @@ export const UnlockOption = Object.freeze({
   MasterPassword: "masterPassword",
   Pin: "pin",
   Biometrics: "biometrics",
+  Prf: "prf",
 }) satisfies { [Prop in keyof UnlockOptions as Capitalize<Prop>]: Prop };
 
 export type UnlockOptions = {
@@ -23,6 +24,9 @@ export type UnlockOptions = {
     enabled: boolean;
     biometricsStatus: BiometricsStatus;
   };
+  prf: {
+    enabled: boolean;
+  };
 };
 
 /**
@@ -33,6 +37,18 @@ export abstract class LockComponentService {
   // Extension
   abstract getBiometricsError(error: any): string | null;
   abstract getPreviousUrl(): string | null;
+  /**
+   * Opens the current page in a popout window if not already in a popout or the sidebar.
+   * If already in a popout or sidebar, does nothing.
+   * @throws Error if execution context is not a browser extension.
+   */
+  abstract popOutBrowserExtension(): Promise<void>;
+  /**
+   * Closes the current popout window if in a popout.
+   * If not in a popout, does nothing.
+   * @throws Error if execution context is not a browser extension.
+   */
+  abstract closeBrowserExtensionPopout(): void;
 
   // Desktop only
   abstract isWindowVisible(): Promise<boolean>;

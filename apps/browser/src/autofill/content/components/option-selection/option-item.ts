@@ -3,6 +3,7 @@ import { html, nothing } from "lit";
 
 import { Theme } from "@bitwarden/common/platform/enums";
 
+import { EventSecurity } from "../../../utils/event-security";
 import { IconProps, Option } from "../common-types";
 import { themes, spacing } from "../constants/styles";
 
@@ -12,17 +13,30 @@ const { css } = createEmotion({
   key: optionItemTagName,
 });
 
-export function OptionItem({
-  icon,
-  text,
-  value,
-  theme,
-  handleSelection,
-}: Option & {
+export type OptionItemProps = Option & {
+  id: string;
+  contextLabel?: string;
   theme: Theme;
   handleSelection: () => void;
-}) {
+};
+
+export function OptionItem({
+  contextLabel,
+  id,
+  icon,
+  text,
+  theme,
+  value,
+  handleSelection,
+}: OptionItemProps) {
   const handleSelectionKeyUpProxy = (event: KeyboardEvent) => {
+    /**
+     * Reject synthetic events (not originating from the user agent)
+     */
+    if (!EventSecurity.isEventTrusted(event)) {
+      return;
+    }
+
     const listenedForKeys = new Set(["Enter", "Space"]);
     if (listenedForKeys.has(event.code) && event.target instanceof Element) {
       handleSelection();
@@ -31,15 +45,33 @@ export function OptionItem({
     return;
   };
 
+  const handleSelectionClickProxy = (event: MouseEvent) => {
+    /**
+     * Reject synthetic events (not originating from the user agent)
+     */
+    if (!EventSecurity.isEventTrusted(event)) {
+      return;
+    }
+
+    handleSelection();
+  };
+
   const iconProps: IconProps = { color: themes[theme].text.main, theme };
   const itemIcon = icon?.(iconProps);
+  const ariaLabel =
+    contextLabel && text
+      ? chrome.i18n.getMessage("selectItemAriaLabel", [contextLabel, text])
+      : text;
 
   return html`<div
     class=${optionItemStyles}
+    data-testid="${id}-option-item"
     key=${value}
     tabindex="0"
     title=${text}
-    @click=${handleSelection}
+    role="option"
+    aria-label=${ariaLabel}
+    @click=${handleSelectionClickProxy}
     @keyup=${handleSelectionKeyUpProxy}
   >
     ${itemIcon ? html`<div class=${optionItemIconContainerStyles}>${itemIcon}</div>` : nothing}
@@ -62,14 +94,15 @@ const optionItemStyles = css`
 `;
 
 const optionItemIconContainerStyles = css`
+  display: flex;
   flex-grow: 1;
   flex-shrink: 1;
-  width: ${optionItemIconWidth}px;
-  height: ${optionItemIconWidth}px;
+  max-width: ${optionItemIconWidth}px;
+  max-height: ${optionItemIconWidth}px;
 
   > svg {
     width: 100%;
-    height: fit-content;
+    height: auto;
   }
 `;
 

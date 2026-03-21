@@ -1,6 +1,6 @@
 <ng-container *ngIf="loading">
   <div class="tw-flex tw-items-center tw-justify-center">
-    <i class="bwi bwi-spinner bwi-spin bwi-3x" aria-hidden="true"></i>
+    <bit-icon name="bwi-spinner" class="bwi-spin bwi-3x" [ariaLabel]="'loading' | i18n"></bit-icon>
   </div>
 </ng-container>
 
@@ -13,11 +13,13 @@
   >
     <app-two-factor-auth-email
       [tokenFormControl]="tokenFormControl"
+      (tokenChange)="saveFormDataWithPartialData($event)"
       *ngIf="selectedProviderType === providerType.Email"
     />
 
     <app-two-factor-auth-authenticator
       [tokenFormControl]="tokenFormControl"
+      (tokenChange)="saveFormDataWithPartialData($event)"
       *ngIf="selectedProviderType === providerType.Authenticator"
     />
     <app-two-factor-auth-yubikey
@@ -36,7 +38,7 @@
     />
     <bit-form-control *ngIf="!hideRememberMe()">
       <bit-label>{{ "dontAskAgainOnThisDeviceFor30Days" | i18n }}</bit-label>
-      <input type="checkbox" bitCheckbox formControlName="remember" />
+      <input type="checkbox" bitCheckbox formControlName="remember" (change)="onRememberChange()" />
     </bit-form-control>
 
     <app-two-factor-auth-webauthn

@@ -1,4 +1,3 @@
-import { DIALOG_DATA, DialogRef } from "@angular/cdk/dialog";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { ActivatedRoute, Router } from "@angular/router";
 import { mock, MockProxy } from "jest-mock-extended";
@@ -15,7 +14,7 @@ import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.servic
 import { MessagingService } from "@bitwarden/common/platform/abstractions/messaging.service";
 import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.service";
 import { FolderService } from "@bitwarden/common/vault/abstractions/folder/folder.service.abstraction";
-import { DialogService } from "@bitwarden/components";
+import { DIALOG_DATA, DialogRef, DialogService } from "@bitwarden/components";
 import { PasswordGenerationServiceAbstraction } from "@bitwarden/generator-legacy";
 import { KeyService } from "@bitwarden/key-management";
 import { CipherFormConfig, DefaultCipherFormConfigService } from "@bitwarden/vault";
@@ -88,7 +87,6 @@ describe("AddEditComponentV2", () => {
         { provide: DIALOG_DATA, useValue: mockParams },
         { provide: DialogRef, useValue: dialogRef },
         { provide: I18nService, useValue: { t: jest.fn().mockReturnValue("login") } },
-        { provide: DialogService, useValue: dialogService },
         { provide: CipherService, useValue: cipherService },
         { provide: MessagingService, useValue: messagingService },
         { provide: OrganizationService, useValue: organizationService },
@@ -106,7 +104,9 @@ describe("AddEditComponentV2", () => {
         },
         { provide: AccountService, useValue: accountService },
       ],
-    }).compileComponents();
+    })
+      .overrideProvider(DialogService, { useValue: dialogService })
+      .compileComponents();
 
     fixture = TestBed.createComponent(AddEditComponentV2);
     component = fixture.componentInstance;

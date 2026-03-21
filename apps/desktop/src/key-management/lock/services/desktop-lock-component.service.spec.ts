@@ -2,11 +2,9 @@ import { TestBed } from "@angular/core/testing";
 import { mock, MockProxy } from "jest-mock-extended";
 import { firstValueFrom, of } from "rxjs";
 
-import {
-  PinServiceAbstraction,
-  UserDecryptionOptionsServiceAbstraction,
-} from "@bitwarden/auth/common";
+import { UserDecryptionOptionsServiceAbstraction } from "@bitwarden/auth/common";
 import { DeviceType } from "@bitwarden/common/enums";
+import { PinServiceAbstraction } from "@bitwarden/common/key-management/pin/pin.service.abstraction";
 import { VaultTimeoutSettingsService } from "@bitwarden/common/key-management/vault-timeout";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { UserId } from "@bitwarden/common/types/guid";
@@ -104,6 +102,22 @@ describe("DesktopLockComponentService", () => {
     });
   });
 
+  describe("popOutBrowserExtension", () => {
+    it("throws platform not supported error", () => {
+      expect(() => service.popOutBrowserExtension()).toThrow(
+        "Method not supported on this platform.",
+      );
+    });
+  });
+
+  describe("closeBrowserExtensionPopout", () => {
+    it("throws platform not supported error", () => {
+      expect(() => service.closeBrowserExtensionPopout()).toThrow(
+        "Method not supported on this platform.",
+      );
+    });
+  });
+
   describe("isWindowVisible", () => {
     it("returns the window visibility", async () => {
       isWindowVisibleMock.mockReturnValue(true);
@@ -163,6 +177,9 @@ describe("DesktopLockComponentService", () => {
             enabled: true,
             biometricsStatus: BiometricsStatus.Available,
           },
+          prf: {
+            enabled: false,
+          },
         },
       ],
       [
@@ -182,6 +199,9 @@ describe("DesktopLockComponentService", () => {
           biometrics: {
             enabled: true,
             biometricsStatus: BiometricsStatus.Available,
+          },
+          prf: {
+            enabled: false,
           },
         },
       ],
@@ -204,6 +224,9 @@ describe("DesktopLockComponentService", () => {
             enabled: false,
             biometricsStatus: BiometricsStatus.NotEnabledLocally,
           },
+          prf: {
+            enabled: false,
+          },
         },
       ],
       [
@@ -224,6 +247,9 @@ describe("DesktopLockComponentService", () => {
             enabled: false,
             biometricsStatus: BiometricsStatus.HardwareUnavailable,
           },
+          prf: {
+            enabled: false,
+          },
         },
       ],
       [
@@ -243,6 +269,9 @@ describe("DesktopLockComponentService", () => {
           biometrics: {
             enabled: false,
             biometricsStatus: BiometricsStatus.PlatformUnsupported,
+          },
+          prf: {
+            enabled: false,
           },
         },
       ],

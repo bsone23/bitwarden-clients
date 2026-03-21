@@ -1,38 +1,57 @@
-import { DIALOG_DATA } from "@angular/cdk/dialog";
 import { CommonModule } from "@angular/common";
 import { Component, Inject } from "@angular/core";
 
-import { JslibModule } from "@bitwarden/angular/jslib.module";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
+import { UnionOfValues } from "@bitwarden/common/vault/types/union-of-values";
 import {
+  DIALOG_DATA,
   ButtonModule,
   DialogModule,
   DialogService,
   ItemModule,
   LinkModule,
+  DialogRef,
+  A11yTitleDirective,
 } from "@bitwarden/components";
 import {
   CredentialGeneratorHistoryDialogComponent,
   GeneratorModule,
 } from "@bitwarden/generator-components";
 import { AlgorithmInfo } from "@bitwarden/generator-core";
+import { I18nPipe } from "@bitwarden/ui-common";
 import { CipherFormGeneratorComponent } from "@bitwarden/vault";
 
 type CredentialGeneratorParams = {
-  onCredentialGenerated: (value?: string) => void;
+  /** @deprecated Prefer use of dialogRef.closed to retreive the generated value */
+  onCredentialGenerated?: (value?: string) => void;
   type: "password" | "username";
+  uri?: string;
 };
 
+export interface CredentialGeneratorDialogResult {
+  action: CredentialGeneratorDialogAction;
+  generatedValue?: string;
+}
+
+export const CredentialGeneratorDialogAction = {
+  Selected: "selected",
+  Canceled: "canceled",
+} as const;
+
+type CredentialGeneratorDialogAction = UnionOfValues<typeof CredentialGeneratorDialogAction>;
+
+// FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
+// eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
-  standalone: true,
   selector: "credential-generator-dialog",
   templateUrl: "credential-generator-dialog.component.html",
   imports: [
+    A11yTitleDirective,
     CipherFormGeneratorComponent,
     CommonModule,
     DialogModule,
     ButtonModule,
-    JslibModule,
+    I18nPipe,
     GeneratorModule,
     ItemModule,
     LinkModule,
@@ -45,6 +64,7 @@ export class CredentialGeneratorDialogComponent {
   constructor(
     @Inject(DIALOG_DATA) protected data: CredentialGeneratorParams,
     private dialogService: DialogService,
+    private dialogRef: DialogRef<CredentialGeneratorDialogResult>,
     private i18nService: I18nService,
   ) {}
 
@@ -59,11 +79,15 @@ export class CredentialGeneratorDialogComponent {
   };
 
   applyCredentials = () => {
-    this.data.onCredentialGenerated(this.credentialValue);
+    this.data.onCredentialGenerated?.(this.credentialValue);
+    this.dialogRef.close({
+      action: CredentialGeneratorDialogAction.Selected,
+      generatedValue: this.credentialValue,
+    });
   };
 
   clearCredentials = () => {
-    this.data.onCredentialGenerated();
+    this.data.onCredentialGenerated?.();
   };
 
   onCredentialGenerated = (value: string) => {
@@ -75,9 +99,12 @@ export class CredentialGeneratorDialogComponent {
     this.dialogService.open(CredentialGeneratorHistoryDialogComponent);
   };
 
-  static open = (dialogService: DialogService, data: CredentialGeneratorParams) => {
-    dialogService.open(CredentialGeneratorDialogComponent, {
-      data,
-    });
-  };
+  static open(dialogService: DialogService, data: CredentialGeneratorParams) {
+    return dialogService.open<CredentialGeneratorDialogResult, CredentialGeneratorParams>(
+      CredentialGeneratorDialogComponent,
+      {
+        data,
+      },
+    );
+  }
 }

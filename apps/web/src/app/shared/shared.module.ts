@@ -13,15 +13,16 @@ import {
   ButtonModule,
   CalloutModule,
   CheckboxModule,
-  ColorPasswordModule,
   ContainerComponent,
   DialogModule,
   FormFieldModule,
   IconButtonModule,
   IconModule,
+  SvgModule,
   LinkModule,
   MenuModule,
   MultiSelectModule,
+  NoItemsModule,
   ProgressModule,
   RadioButtonModule,
   SectionComponent,
@@ -32,15 +33,11 @@ import {
   TypographyModule,
 } from "@bitwarden/components";
 
-// Register the locales for the application
-import "./locales";
-
 /**
- * This NgModule should contain the most basic shared directives, pipes, and components. They
- * should be widely used by other modules to be considered for adding to this module. If in doubt
- * do not add to this module.
+ * @deprecated Please directly import the relevant directive/pipe/component.
  *
- * See: https://angular.io/guide/module-types#shared-ngmodules
+ * This module is overly large and adds many unrelated modules to your dependency tree.
+ * https://angular.dev/guide/ngmodules/overview recommends not using `NgModule`s for new code.
  */
 @NgModule({
   imports: [
@@ -60,15 +57,16 @@ import "./locales";
     ButtonModule,
     CalloutModule,
     CheckboxModule,
-    ColorPasswordModule,
     ContainerComponent,
     DialogModule,
     FormFieldModule,
     IconButtonModule,
     IconModule,
+    SvgModule,
     LinkModule,
     MenuModule,
     MultiSelectModule,
+    NoItemsModule,
     ProgressModule,
     RadioButtonModule,
     SectionComponent,
@@ -95,15 +93,16 @@ import "./locales";
     ButtonModule,
     CalloutModule,
     CheckboxModule,
-    ColorPasswordModule,
     ContainerComponent,
     DialogModule,
     FormFieldModule,
     IconButtonModule,
     IconModule,
+    SvgModule,
     LinkModule,
     MenuModule,
     MultiSelectModule,
+    NoItemsModule,
     ProgressModule,
     RadioButtonModule,
     SectionComponent,

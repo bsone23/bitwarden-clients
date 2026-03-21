@@ -1,21 +1,32 @@
 // FIXME: Update this file to be type safe and remove this and next line
 // @ts-strict-ignore
 import { CommonModule, DatePipe } from "@angular/common";
-import { Component, EventEmitter, inject, Input, Output } from "@angular/core";
+import {
+  Component,
+  ElementRef,
+  EventEmitter,
+  inject,
+  input,
+  Input,
+  OnChanges,
+  Output,
+  ResourceRef,
+  SimpleChanges,
+  ViewChild,
+} from "@angular/core";
 import { Observable, switchMap } from "rxjs";
 
+import { PremiumBadgeComponent } from "@bitwarden/angular/billing/components/premium-badge";
 import { JslibModule } from "@bitwarden/angular/jslib.module";
-import { EventCollectionService } from "@bitwarden/common/abstractions/event/event-collection.service";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { BillingAccountProfileStateService } from "@bitwarden/common/billing/abstractions";
-import { EventType } from "@bitwarden/common/enums";
+import { EventCollectionService, EventType } from "@bitwarden/common/dirt/event-logs";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { UserId } from "@bitwarden/common/types/guid";
 import { PremiumUpgradePromptService } from "@bitwarden/common/vault/abstractions/premium-upgrade-prompt.service";
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 import {
   FormFieldModule,
-  SectionComponent,
   SectionHeaderComponent,
   TypographyModule,
   LinkModule,
@@ -32,14 +43,14 @@ type TotpCodeValues = {
   totpCodeFormatted?: string;
 };
 
+// FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
+// eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
   selector: "app-login-credentials-view",
   templateUrl: "login-credentials-view.component.html",
-  standalone: true,
   imports: [
     CommonModule,
     JslibModule,
-    SectionComponent,
     SectionHeaderComponent,
     TypographyModule,
     FormFieldModule,
@@ -49,13 +60,27 @@ type TotpCodeValues = {
     BitTotpCountdownComponent,
     ReadOnlyCipherCardComponent,
     LinkModule,
+    PremiumBadgeComponent,
   ],
 })
-export class LoginCredentialsViewComponent {
+export class LoginCredentialsViewComponent implements OnChanges {
+  // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
+  // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() cipher: CipherView;
+  // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
+  // eslint-disable-next-line @angular-eslint/prefer-signals
   @Input() activeUserId: UserId;
-  @Input() hadPendingChangePasswordTask: boolean;
+  // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
+  // eslint-disable-next-line @angular-eslint/prefer-signals
+  @Input() showChangePasswordLink: boolean;
+  readonly changePasswordUrl = input<ResourceRef<string>>();
+  // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
+  // eslint-disable-next-line @angular-eslint/prefer-output-emitter-ref
   @Output() handleChangePassword = new EventEmitter<void>();
+  // FIXME(https://bitwarden.atlassian.net/browse/CL-903): Migrate to Signals
+  // eslint-disable-next-line @angular-eslint/prefer-signals
+  @ViewChild("passwordInput")
+  private passwordInput!: ElementRef<HTMLInputElement>;
 
   isPremium$: Observable<boolean> = this.accountService.activeAccount$.pipe(
     switchMap((account) =>
@@ -85,8 +110,15 @@ export class LoginCredentialsViewComponent {
     return `${dateCreated} ${creationDate}`;
   }
 
-  async getPremium(organizationId?: string) {
-    await this.premiumUpgradeService.promptForPremium(organizationId);
+  ngOnChanges(changes: SimpleChanges): void {
+    if (changes["cipher"]) {
+      if (this.passwordInput?.nativeElement) {
+        // Reset password input type in case it's been toggled
+        this.passwordInput.nativeElement.type = "password";
+      }
+      this.passwordRevealed = false;
+      this.showPasswordCount = false;
+    }
   }
 
   async pwToggleValue(passwordVisible: boolean) {

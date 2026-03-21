@@ -2,9 +2,9 @@ import { Meta, moduleMetadata, StoryObj } from "@storybook/angular";
 
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 
+import { formatArgsForCodeSnippet } from "../../../../.storybook/format-args-for-code-snippet";
 import { IconButtonModule } from "../icon-button";
 import { LinkModule } from "../link";
-import { SharedModule } from "../shared/shared.module";
 import { I18nMockService } from "../utils/i18n-mock.service";
 
 import { BannerComponent } from "./banner.component";
@@ -14,13 +14,14 @@ export default {
   component: BannerComponent,
   decorators: [
     moduleMetadata({
-      imports: [SharedModule, IconButtonModule, LinkModule],
+      imports: [IconButtonModule, LinkModule],
       providers: [
         {
           provide: I18nService,
           useFactory: () => {
             return new I18nMockService({
               close: "Close",
+              loading: "Loading",
             });
           },
         },
@@ -44,48 +45,50 @@ export default {
 
 type Story = StoryObj<BannerComponent>;
 
+export const Base: Story = {
+  render: (args) => {
+    return {
+      props: args,
+      template: /*html*/ `
+        <bit-banner ${formatArgsForCodeSnippet<BannerComponent>(args)}>
+          Content Really Long Text Lorem Ipsum Ipsum Ipsum
+          <button type="button" bitLink linkType="secondary">Button</button>
+        </bit-banner>
+      `,
+    };
+  },
+};
+
 export const Premium: Story = {
+  ...Base,
   args: {
     bannerType: "premium",
   },
-  render: (args) => ({
-    props: args,
-    template: `
-      <bit-banner [bannerType]="bannerType" (onClose)="onClose($event)" [showClose]=showClose>
-        Content Really Long Text Lorem Ipsum Ipsum Ipsum
-        <button bitLink linkType="secondary">Button</button>
-      </bit-banner>
-      `,
-  }),
-};
-
-Premium.args = {
-  bannerType: "premium",
 };
 
 export const Info: Story = {
-  ...Premium,
+  ...Base,
   args: {
     bannerType: "info",
   },
 };
 
 export const Warning: Story = {
-  ...Premium,
+  ...Base,
   args: {
     bannerType: "warning",
   },
 };
 
 export const Danger: Story = {
-  ...Premium,
+  ...Base,
   args: {
     bannerType: "danger",
   },
 };
 
 export const HideClose: Story = {
-  ...Premium,
+  ...Base,
   args: {
     showClose: false,
   },

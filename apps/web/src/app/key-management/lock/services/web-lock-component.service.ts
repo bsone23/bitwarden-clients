@@ -1,16 +1,18 @@
 import { inject } from "@angular/core";
-import { map, Observable } from "rxjs";
+import { combineLatest, defer, map, Observable } from "rxjs";
 
-import {
-  UserDecryptionOptions,
-  UserDecryptionOptionsServiceAbstraction,
-} from "@bitwarden/auth/common";
+import { UserDecryptionOptionsServiceAbstraction } from "@bitwarden/auth/common";
 import { UserId } from "@bitwarden/common/types/guid";
 import { BiometricsStatus } from "@bitwarden/key-management";
-import { LockComponentService, UnlockOptions } from "@bitwarden/key-management-ui";
+import {
+  LockComponentService,
+  UnlockOptions,
+  WebAuthnPrfUnlockService,
+} from "@bitwarden/key-management-ui";
 
 export class WebLockComponentService implements LockComponentService {
   private readonly userDecryptionOptionsService = inject(UserDecryptionOptionsServiceAbstraction);
+  private readonly webAuthnPrfUnlockService = inject(WebAuthnPrfUnlockService);
 
   constructor() {}
 
@@ -24,6 +26,14 @@ export class WebLockComponentService implements LockComponentService {
     return null;
   }
 
+  popOutBrowserExtension(): Promise<void> {
+    throw new Error("Method not supported on this platform.");
+  }
+
+  closeBrowserExtensionPopout(): void {
+    throw new Error("Method not supported on this platform.");
+  }
+
   async isWindowVisible(): Promise<boolean> {
     throw new Error("Method not implemented.");
   }
@@ -35,8 +45,14 @@ export class WebLockComponentService implements LockComponentService {
   }
 
   getAvailableUnlockOptions$(userId: UserId): Observable<UnlockOptions | null> {
-    return this.userDecryptionOptionsService.userDecryptionOptionsById$(userId)?.pipe(
-      map((userDecryptionOptions: UserDecryptionOptions) => {
+    return combineLatest([
+      this.userDecryptionOptionsService.userDecryptionOptionsById$(userId),
+      defer(async () => {
+        const available = await this.webAuthnPrfUnlockService.isPrfUnlockAvailable(userId);
+        return { available };
+      }),
+    ]).pipe(
+      map(([userDecryptionOptions, prfUnlockInfo]) => {
         const unlockOpts: UnlockOptions = {
           masterPassword: {
             enabled: userDecryptionOptions.hasMasterPassword,
@@ -47,6 +63,9 @@ export class WebLockComponentService implements LockComponentService {
           biometrics: {
             enabled: false,
             biometricsStatus: BiometricsStatus.PlatformUnsupported,
+          },
+          prf: {
+            enabled: prfUnlockInfo.available,
           },
         };
         return unlockOpts;

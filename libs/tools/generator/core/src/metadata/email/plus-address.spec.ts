@@ -1,8 +1,13 @@
+/// SDK/WASM code relies on TextEncoder/TextDecoder being available globally
+import { TextEncoder, TextDecoder } from "util";
+Object.assign(global, { TextDecoder, TextEncoder });
+
 import { mock } from "jest-mock-extended";
 
 import { EmailRandomizer } from "../../engine";
 import { SubaddressConstraints } from "../../policies/subaddress-constraints";
-import { SubaddressGenerationOptions, GeneratorDependencyProvider } from "../../types";
+import { GeneratorDependencyProvider } from "../../providers";
+import { SubaddressGenerationOptions } from "../../types";
 import { Profile } from "../data";
 import { CoreProfileMetadata } from "../profile-metadata";
 import { isCoreProfile } from "../util";
@@ -19,11 +24,13 @@ describe("email - plus address generator metadata", () => {
   });
 
   describe("profiles[account]", () => {
-    let accountProfile: CoreProfileMetadata<SubaddressGenerationOptions> = null;
+    let accountProfile: CoreProfileMetadata<SubaddressGenerationOptions> = null!;
     beforeEach(() => {
       const profile = plusAddress.profiles[Profile.account];
-      if (isCoreProfile(profile)) {
+      if (isCoreProfile(profile!)) {
         accountProfile = profile;
+      } else {
+        throw new Error("this branch should never run");
       }
     });
 

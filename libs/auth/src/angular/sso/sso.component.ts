@@ -16,7 +16,6 @@ import {
 } from "@bitwarden/auth/common";
 import { ApiService } from "@bitwarden/common/abstractions/api.service";
 import { OrgDomainApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/organization-domain/org-domain-api.service.abstraction";
-import { OrganizationDomainSsoDetailsResponse } from "@bitwarden/common/admin-console/abstractions/organization-domain/responses/organization-domain-sso-details.response";
 import { VerifiedOrganizationDomainSsoDetailsResponse } from "@bitwarden/common/admin-console/abstractions/organization-domain/responses/verified-organization-domain-sso-details.response";
 import { AccountService } from "@bitwarden/common/auth/abstractions/account.service";
 import { SsoLoginServiceAbstraction } from "@bitwarden/common/auth/abstractions/sso-login.service.abstraction";
@@ -24,24 +23,26 @@ import { AuthResult } from "@bitwarden/common/auth/models/domain/auth-result";
 import { ForceSetPasswordReason } from "@bitwarden/common/auth/models/domain/force-set-password-reason";
 import { SsoPreValidateResponse } from "@bitwarden/common/auth/models/response/sso-pre-validate.response";
 import { ClientType, HttpStatusCode } from "@bitwarden/common/enums";
-import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
+import { CryptoFunctionService } from "@bitwarden/common/key-management/crypto/abstractions/crypto-function.service";
+import { KeyConnectorService } from "@bitwarden/common/key-management/key-connector/abstractions/key-connector.service";
 import { InternalMasterPasswordServiceAbstraction } from "@bitwarden/common/key-management/master-password/abstractions/master-password.service.abstraction";
 import { ErrorResponse } from "@bitwarden/common/models/response/error.response";
 import { ListResponse } from "@bitwarden/common/models/response/list.response";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
-import { CryptoFunctionService } from "@bitwarden/common/platform/abstractions/crypto-function.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { PlatformUtilsService } from "@bitwarden/common/platform/abstractions/platform-utils.service";
 import { ValidationService } from "@bitwarden/common/platform/abstractions/validation.service";
 import { Utils } from "@bitwarden/common/platform/misc/utils";
+// This import has been flagged as unallowed for this class. It may be involved in a circular dependency loop.
+// eslint-disable-next-line no-restricted-imports
 import {
   AsyncActionsModule,
   ButtonModule,
   CheckboxModule,
   FormFieldModule,
   IconButtonModule,
+  IconModule,
   LinkModule,
   ToastService,
 } from "@bitwarden/components";
@@ -62,8 +63,9 @@ interface QueryParams {
 /**
  * This component handles the SSO flow.
  */
+// FIXME(https://bitwarden.atlassian.net/browse/CL-764): Migrate to OnPush
+// eslint-disable-next-line @angular-eslint/prefer-on-push-component-change-detection
 @Component({
-  standalone: true,
   templateUrl: "sso.component.html",
   imports: [
     AsyncActionsModule,
@@ -72,6 +74,7 @@ interface QueryParams {
     CommonModule,
     FormFieldModule,
     IconButtonModule,
+    IconModule,
     LinkModule,
     JslibModule,
     ReactiveFormsModule,
@@ -106,7 +109,6 @@ export class SsoComponent implements OnInit {
     private route: ActivatedRoute,
     private orgDomainApiService: OrgDomainApiServiceAbstraction,
     private validationService: ValidationService,
-    private configService: ConfigService,
     private platformUtilsService: PlatformUtilsService,
     private apiService: ApiService,
     private cryptoFunctionService: CryptoFunctionService,
@@ -119,6 +121,7 @@ export class SsoComponent implements OnInit {
     private toastService: ToastService,
     private ssoComponentService: SsoComponentService,
     private loginSuccessHandlerService: LoginSuccessHandlerService,
+    private keyConnectorService: KeyConnectorService,
   ) {
     environmentService.environment$.pipe(takeUntilDestroyed()).subscribe((env) => {
       this.redirectUri = env.getWebVaultUrl() + "/sso-connector.html";
@@ -155,7 +158,14 @@ export class SsoComponent implements OnInit {
       return;
     }
 
-    // Detect if we have landed here but only have an SSO identifier in the URL.
+    // Detect if we are on the first portion of the SSO flow
+    // and have been sent here from another client with the info in query params.
+    // If so, we want to initialize the SSO flow with those values.
+    if (this.hasParametersFromOtherClientRedirect(qParams)) {
+      this.initializeFromRedirectFromOtherClient(qParams);
+    }
+
+    // Detect if we have landed here with an SSO identifier in the URL.
     // This is used by integrations that want to "short-circuit" the login to send users
     // directly to their IdP to simulate IdP-initiated SSO, so we submit automatically.
     if (qParams.identifier != null) {
@@ -163,13 +173,6 @@ export class SsoComponent implements OnInit {
       this.loggingIn = true;
       await this.submit();
       return;
-    }
-
-    // Detect if we are on the first portion of the SSO flow
-    // and have been sent here from another client with the info in query params.
-    // If so, we want to initialize the SSO flow with those values.
-    if (this.hasParametersFromOtherClientRedirect(qParams)) {
-      this.initializeFromRedirectFromOtherClient(qParams);
     }
 
     // Try to determine the identifier using claimed domain or local state
@@ -291,6 +294,7 @@ export class SsoComponent implements OnInit {
     this.identifier = this.identifierFormControl.value ?? "";
     await this.ssoLoginService.setOrganizationSsoIdentifier(this.identifier);
     this.ssoComponentService.setDocumentCookies?.();
+
     try {
       await this.submitSso();
     } catch (error) {
@@ -355,7 +359,7 @@ export class SsoComponent implements OnInit {
     if (codeChallenge == null) {
       const codeVerifier = await this.passwordGenerationService.generatePassword(passwordOptions);
       const codeVerifierHash = await this.cryptoFunctionService.hash(codeVerifier, "sha256");
-      codeChallenge = Utils.fromBufferToUrlB64(codeVerifierHash);
+      codeChallenge = Utils.fromArrayToUrlB64(codeVerifierHash)!;
       await this.ssoLoginService.setCodeVerifier(codeVerifier);
     }
 
@@ -435,7 +439,7 @@ export class SsoComponent implements OnInit {
 
       // Everything after the 2FA check is considered a successful login
       // Just have to figure out where to send the user
-      await this.loginSuccessHandlerService.run(authResult.userId);
+      await this.loginSuccessHandlerService.run(authResult.userId, null);
 
       // Save off the OrgSsoIdentifier for use in the TDE flows (or elsewhere)
       // - TDE login decryption options component
@@ -447,9 +451,18 @@ export class SsoComponent implements OnInit {
         authResult.userId,
       );
 
+      if (
+        (await firstValueFrom(
+          this.keyConnectorService.requiresDomainConfirmation$(authResult.userId),
+        )) != null
+      ) {
+        await this.router.navigate(["confirm-key-connector-domain"]);
+        return;
+      }
+
       // must come after 2fa check since user decryption options aren't available if 2fa is required
       const userDecryptionOpts = await firstValueFrom(
-        this.userDecryptionOptionsService.userDecryptionOptions$,
+        this.userDecryptionOptionsService.userDecryptionOptionsById$(authResult.userId),
       );
 
       const tdeEnabled = userDecryptionOpts.trustedDeviceOption
@@ -467,7 +480,7 @@ export class SsoComponent implements OnInit {
         !userDecryptionOpts.hasMasterPassword &&
         userDecryptionOpts.keyConnectorOption === undefined;
 
-      if (requireSetPassword || authResult.resetMasterPassword) {
+      if (requireSetPassword) {
         // Change implies going no password -> password in this case
         return await this.handleChangePasswordRequired(orgSsoIdentifier);
       }
@@ -534,15 +547,8 @@ export class SsoComponent implements OnInit {
   }
 
   private async handleChangePasswordRequired(orgIdentifier: string) {
-    await this.router.navigate(["set-password-jit"], {
-      queryParams: {
-        identifier: orgIdentifier,
-      },
-    });
-  }
-
-  private async handleForcePasswordReset(orgIdentifier: string) {
-    await this.router.navigate(["update-temp-password"], {
+    const route = "set-initial-password";
+    await this.router.navigate([route], {
       queryParams: {
         identifier: orgIdentifier,
       },
@@ -605,24 +611,13 @@ export class SsoComponent implements OnInit {
       this.loggingIn = true;
       try {
         // Check if email matches any claimed domains
-        if (await this.configService.getFeatureFlag(FeatureFlag.VerifiedSsoDomainEndpoint)) {
-          const response: ListResponse<VerifiedOrganizationDomainSsoDetailsResponse> =
-            await this.orgDomainApiService.getVerifiedOrgDomainsByEmail(this.email);
+        const response: ListResponse<VerifiedOrganizationDomainSsoDetailsResponse> =
+          await this.orgDomainApiService.getVerifiedOrgDomainsByEmail(this.email);
 
-          if (response.data.length > 0) {
-            this.identifierFormControl.setValue(response.data[0].organizationIdentifier);
-            await this.submit();
-            return;
-          }
-        } else {
-          const response: OrganizationDomainSsoDetailsResponse =
-            await this.orgDomainApiService.getClaimedOrgDomainByEmail(this.email);
-
-          if (response?.ssoAvailable && response?.verifiedDate) {
-            this.identifierFormControl.setValue(response.organizationIdentifier);
-            await this.submit();
-            return;
-          }
+        if (response.data.length > 0) {
+          this.identifierFormControl.setValue(response.data[0].organizationIdentifier);
+          await this.submit();
+          return;
         }
       } catch (error) {
         this.handleGetClaimedDomainByEmailError(error);
