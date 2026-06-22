@@ -37,6 +37,7 @@ export class Organization {
   useResetPassword: boolean;
   useSecretsManager: boolean;
   usePasswordManager: boolean;
+  usePam: boolean;
   useActivateAutofillPolicy: boolean;
   useAutomaticUserConfirmation: boolean;
   selfHost: boolean;
@@ -101,6 +102,7 @@ export class Organization {
   ssoMemberDecryptionType?: MemberDecryptionType;
   usePhishingBlocker: boolean;
   useMyItems: boolean;
+  useInviteLinks: boolean;
 
   constructor(obj?: OrganizationData) {
     if (obj == null) {
@@ -127,6 +129,7 @@ export class Organization {
     this.useResetPassword = obj.useResetPassword;
     this.useSecretsManager = obj.useSecretsManager;
     this.usePasswordManager = obj.usePasswordManager;
+    this.usePam = obj.usePam;
     this.useActivateAutofillPolicy = obj.useActivateAutofillPolicy;
     this.useAutomaticUserConfirmation = obj.useAutomaticUserConfirmation;
     this.selfHost = obj.selfHost;
@@ -168,6 +171,7 @@ export class Organization {
     this.ssoMemberDecryptionType = obj.ssoMemberDecryptionType;
     this.usePhishingBlocker = obj.usePhishingBlocker;
     this.useMyItems = obj.useMyItems;
+    this.useInviteLinks = obj.useInviteLinks;
   }
 
   get canAccess() {

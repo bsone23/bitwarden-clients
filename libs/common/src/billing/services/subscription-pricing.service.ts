@@ -1,6 +1,5 @@
 import {
   combineLatest,
-  combineLatestWith,
   from,
   map,
   Observable,
@@ -86,32 +85,43 @@ export class DefaultSubscriptionPricingService implements SubscriptionPricingSer
       }),
     );
 
-  private organizationPlansResponse$: Observable<ListResponse<PlanResponse>> =
-    this.environmentService.environment$.pipe(
-      take(1),
-      switchMap((environment) =>
-        !environment.isCloud()
-          ? of({ data: [] } as unknown as ListResponse<PlanResponse>)
-          : from(this.billingApiService.getPlans()),
-      ),
-      shareReplay({ bufferSize: 1, refCount: false }),
-    );
+  // QA-only: lets a self-hosted-region client fetch cloud pricing so the
+  // premium checkout dialog can display prices. Off by default; only delivered
+  // by servers that enable it.
+  private bypassSelfHostPremiumCheck$ = this.configService.getFeatureFlag$(
+    FeatureFlag.DebugDisableSelfHostPremiumCheck,
+  );
 
-  private premiumPlanResponse$: Observable<PremiumPlanResponse> =
-    this.environmentService.environment$.pipe(
-      take(1),
-      switchMap((environment) =>
-        !environment.isCloud()
-          ? of({ seat: undefined, storage: undefined } as unknown as PremiumPlanResponse)
-          : from(this.billingApiService.getPremiumPlan()).pipe(
-              catchError((error: unknown) => {
-                this.logService.error("Failed to fetch premium plan from API", error);
-                return throwError(() => error); // Re-throw to propagate to higher-level error handler
-              }),
-            ),
-      ),
-      shareReplay({ bufferSize: 1, refCount: false }),
-    );
+  private organizationPlansResponse$: Observable<ListResponse<PlanResponse>> = combineLatest([
+    this.environmentService.environment$,
+    this.bypassSelfHostPremiumCheck$,
+  ]).pipe(
+    take(1),
+    switchMap(([environment, bypassSelfHostCheck]) =>
+      !environment.isCloud() && !bypassSelfHostCheck
+        ? of({ data: [] } as unknown as ListResponse<PlanResponse>)
+        : from(this.billingApiService.getPlans()),
+    ),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
+
+  private premiumPlanResponse$: Observable<PremiumPlanResponse> = combineLatest([
+    this.environmentService.environment$,
+    this.bypassSelfHostPremiumCheck$,
+  ]).pipe(
+    take(1),
+    switchMap(([environment, bypassSelfHostCheck]) =>
+      !environment.isCloud() && !bypassSelfHostCheck
+        ? of({ seat: undefined, storage: undefined } as unknown as PremiumPlanResponse)
+        : from(this.billingApiService.getPremiumPlan()).pipe(
+            catchError((error: unknown) => {
+              this.logService.error("Failed to fetch premium plan from API", error);
+              return throwError(() => error); // Re-throw to propagate to higher-level error handler
+            }),
+          ),
+    ),
+    shareReplay({ bufferSize: 1, refCount: false }),
+  );
 
   private premium$: Observable<PersonalSubscriptionPricingTier> = this.premiumPlanResponse$.pipe(
     map((premiumPlan) => ({
@@ -137,13 +147,8 @@ export class DefaultSubscriptionPricingService implements SubscriptionPricingSer
 
   private families$: Observable<PersonalSubscriptionPricingTier> =
     this.organizationPlansResponse$.pipe(
-      combineLatestWith(this.configService.getFeatureFlag$(FeatureFlag.PM26462_Milestone_3)),
-      map(([plans, milestone3FeatureEnabled]) => {
-        const familiesPlan = plans.data.find(
-          (plan) =>
-            plan.type ===
-            (milestone3FeatureEnabled ? PlanType.FamiliesAnnually : PlanType.FamiliesAnnually2025),
-        );
+      map((plans) => {
+        const familiesPlan = plans.data.find((plan) => plan.type === PlanType.FamiliesAnnually);
 
         return {
           id: PersonalSubscriptionPricingTierIds.Families,

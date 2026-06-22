@@ -7,21 +7,13 @@ import {
   PasswordInputResult,
   RegistrationFinishService,
 } from "@bitwarden/auth/angular";
-import { PolicyApiServiceAbstraction } from "@bitwarden/common/admin-console/abstractions/policy/policy-api.service.abstraction";
 import { PolicyService } from "@bitwarden/common/admin-console/abstractions/policy/policy.service.abstraction";
 import { MasterPasswordPolicyOptions } from "@bitwarden/common/admin-console/models/domain/master-password-policy-options";
-import { Policy } from "@bitwarden/common/admin-console/models/domain/policy";
 import { AccountApiService } from "@bitwarden/common/auth/abstractions/account-api.service";
-import { RegisterFinishRequestWithAuthUnlockDataTypes } from "@bitwarden/common/auth/models/request/registration/register-finish-request-with-auth-unlock-data.types";
 import { RegisterFinishRequest } from "@bitwarden/common/auth/models/request/registration/register-finish.request";
-import { OrganizationInviteService } from "@bitwarden/common/auth/services/organization-invite/organization-invite.service";
-import {
-  EncryptedString,
-  EncString,
-} from "@bitwarden/common/key-management/crypto/models/enc-string";
+import { OrganizationInviteService } from "@bitwarden/common/auth/organization-invite/organization-invite.service";
+import { EncString } from "@bitwarden/common/key-management/crypto/models/enc-string";
 import { MasterPasswordServiceAbstraction } from "@bitwarden/common/key-management/master-password/abstractions/master-password.service.abstraction";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
-import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
 import { UserKey } from "@bitwarden/common/types/key";
 import { KeyService } from "@bitwarden/key-management";
 
@@ -33,13 +25,10 @@ export class WebRegistrationFinishService
     protected keyService: KeyService,
     protected accountApiService: AccountApiService,
     protected masterPasswordService: MasterPasswordServiceAbstraction,
-    protected configService: ConfigService,
     private organizationInviteService: OrganizationInviteService,
-    private policyApiService: PolicyApiServiceAbstraction,
-    private logService: LogService,
     private policyService: PolicyService,
   ) {
-    super(keyService, accountApiService, masterPasswordService, configService);
+    super(keyService, accountApiService, masterPasswordService);
   }
 
   override async getOrgNameFromOrgInvite(): Promise<string | null> {
@@ -51,6 +40,13 @@ export class WebRegistrationFinishService
     return orgInvite.organizationName;
   }
 
+  // TODO: when invite acceptance becomes cross-client (the upcoming extension work),
+  // drop `getMasterPasswordPolicyOptsFromOrgInvite` from `RegistrationFinishService` entirely.
+  // `OrganizationInviteService.getMasterPasswordPolicyOptionsForInvite(orgInvite)` (introduced
+  // for PM-35783) is cross-platform and produces the same result, so the registration-finish
+  // component can do the stash-read + projection inline against the org-invite service. The
+  // service contract method here exists only to abstract "MP requirements come from invite vs.
+  // nowhere," which collapses once every client supports invite registration.
   override async getMasterPasswordPolicyOptsFromOrgInvite(): Promise<MasterPasswordPolicyOptions | null> {
     // If there's a deep linked org invite, use it to get the password policies
     const orgInvite = await this.organizationInviteService.getOrganizationInvite();
@@ -59,17 +55,7 @@ export class WebRegistrationFinishService
       return null;
     }
 
-    let policies: Policy[] | null = null;
-    try {
-      policies = await this.policyApiService.getPoliciesByToken(
-        orgInvite.organizationId,
-        orgInvite.token,
-        orgInvite.email,
-        orgInvite.organizationUserId,
-      );
-    } catch (e) {
-      this.logService.error(e);
-    }
+    const policies = await this.organizationInviteService.getInvitePolicies(orgInvite);
 
     if (policies == null) {
       return null;
@@ -87,7 +73,6 @@ export class WebRegistrationFinishService
     newUserKey: UserKey,
     email: string,
     passwordInputResult: PasswordInputResult,
-    encryptedUserKey: EncryptedString,
     userAsymmetricKeys: [string, EncString],
     emailVerificationToken?: string,
     orgSponsoredFreeFamilyPlanToken?: string,
@@ -95,12 +80,11 @@ export class WebRegistrationFinishService
     emergencyAccessId?: string,
     providerInviteToken?: string,
     providerUserId?: string,
-  ): Promise<RegisterFinishRequest | RegisterFinishRequestWithAuthUnlockDataTypes> {
+  ): Promise<RegisterFinishRequest> {
     const registerRequest = await super.buildRegisterRequest(
       newUserKey,
       email,
       passwordInputResult,
-      encryptedUserKey,
       userAsymmetricKeys,
       emailVerificationToken,
     );

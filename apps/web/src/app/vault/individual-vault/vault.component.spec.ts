@@ -1,3 +1,4 @@
+import { SelectionModel } from "@angular/cdk/collections";
 import { NO_ERRORS_SCHEMA } from "@angular/core";
 import { ComponentFixture, TestBed } from "@angular/core/testing";
 import { By } from "@angular/platform-browser";
@@ -50,22 +51,28 @@ import { CipherViewLike } from "@bitwarden/common/vault/utils/cipher-view-like-u
 import { DialogRef, DialogService, ToastService } from "@bitwarden/components";
 import { MessageListener } from "@bitwarden/messaging";
 import {
+  ASSIGN_COLLECTIONS_DIALOG,
+  AssignCollectionsDialogRef,
+  AssignCollectionsResult,
+  BULK_DELETE_DIALOG,
+  BulkDeleteDialogRef,
+  BulkDeleteDialogResult,
   DefaultCipherFormConfigService,
   PasswordRepromptService,
   RoutedVaultFilterBridgeService,
   RoutedVaultFilterService,
+  VaultBatchBarService,
   VaultFilter,
   VaultFilterServiceAbstraction,
+  VaultItem,
+  VaultItemDialogComponent,
+  VaultItemDialogResult,
   VaultItemEvent,
   VaultItemsTransferService,
 } from "@bitwarden/vault";
 
 import { OrganizationWarningsService } from "../../billing/organizations/warnings/services";
 import { ProductSwitcherService } from "../../layouts/product-switcher/shared/product-switcher.service";
-import {
-  VaultItemDialogComponent,
-  VaultItemDialogResult,
-} from "../components/vault-item-dialog/vault-item-dialog.component";
 import { VaultItemsComponent } from "../components/vault-items/vault-items.component";
 import { WebVaultExtensionPromptService } from "../services/web-vault-extension-prompt.service";
 import { WebVaultPromptService } from "../services/web-vault-prompt.service";
@@ -160,7 +167,13 @@ describe("VaultComponent", () => {
         { provide: OrganizationWarningsService, useValue: mock<OrganizationWarningsService>() },
         { provide: PremiumUpgradePromptService, useValue: mock<PremiumUpgradePromptService>() },
         { provide: SyncService, useValue: mock<SyncService>() },
-        { provide: ConfigService, useValue: mock<ConfigService>() },
+        {
+          provide: ConfigService,
+          useValue: {
+            ...mock<ConfigService>(),
+            getFeatureFlag$: jest.fn().mockReturnValue(of(false)),
+          },
+        },
         { provide: DialogService, useValue: mock<DialogService>() },
         { provide: WelcomeDialogService, useValue: mock<WelcomeDialogService>() },
         { provide: OrganizationUserApiService, useValue: mock<OrganizationUserApiService>() },
@@ -224,9 +237,10 @@ describe("VaultComponent", () => {
         {
           provide: CipherArchiveService,
           useValue: {
-            hasArchiveFlagEnabled$: of(false),
             userCanArchive$: jest.fn().mockReturnValue(of(false)),
             showSubscriptionEndedMessaging$: jest.fn().mockReturnValue(of(false)),
+            archivedCiphers$: jest.fn().mockReturnValue(of([])),
+            userHasPremium$: jest.fn().mockReturnValue(of([])),
           },
         },
         {
@@ -286,6 +300,32 @@ describe("VaultComponent", () => {
             {
               provide: VaultItemsTransferService,
               useValue: mock<VaultItemsTransferService>(),
+            },
+            {
+              provide: VaultBatchBarService,
+              useValue: {
+                completed$: EMPTY,
+                selection: new SelectionModel<VaultItem<any>>(true, [], true),
+                setConfig: jest.fn(),
+                bulkArchive: jest.fn(),
+                bulkUnarchive: jest.fn(),
+                bulkRestore: jest.fn(),
+                bulkDelete: jest.fn(),
+                bulkMoveToFolder: jest.fn(),
+                bulkAssignToCollections: jest.fn(),
+              },
+            },
+            {
+              provide: ASSIGN_COLLECTIONS_DIALOG,
+              useValue: {
+                open: jest.fn().mockResolvedValue(AssignCollectionsResult.Canceled),
+              } satisfies AssignCollectionsDialogRef,
+            },
+            {
+              provide: BULK_DELETE_DIALOG,
+              useValue: {
+                open: jest.fn().mockResolvedValue(BulkDeleteDialogResult.Canceled),
+              } satisfies BulkDeleteDialogRef,
             },
           ],
         },

@@ -1,35 +1,109 @@
 <bit-dialog #dialog dialogSize="large" background="alt">
   <span bitDialogTitle>
-    {{ headerText }}
+    {{ headerText() | i18n }}
   </span>
+  @if (showGenerator()) {
+    <button
+      bitDialogHeaderEnd
+      type="button"
+      bitIconButton="bwi-close"
+      buttonType="primaryGhost"
+      size="default"
+      [label]="'close' | i18n"
+      (click)="closeGenerator()"
+    ></button>
+  }
   <span bitDialogContent>
-    <tools-send-form
-      formId="sendForm"
-      [config]="config"
-      (onSendCreated)="onSendCreated($event)"
-      (onSendUpdated)="onSendUpdated($event)"
-      [submitBtn]="submitBtn"
-    >
-    </tools-send-form>
+    @if (showGenerator()) {
+      <vault-cipher-form-generator
+        type="password"
+        (valueGenerated)="onValueGenerated($event)"
+        (algorithmSelected)="onAlgorithmSelected($event)"
+        disableMargin
+      ></vault-cipher-form-generator>
+    }
+    <div [hidden]="showGenerator()">
+      @if (disableForm) {
+        <bit-callout type="info" [title]="'sendNotCompliantWithYourOrgsPolicy' | i18n">
+          @if (showCopyButton()) {
+            <div>{{ "sendDisabledNonCompliantBannerMessage" | i18n }}</div>
+            <button
+              class="tw-mt-4"
+              type="button"
+              bitButton
+              buttonType="primary"
+              (click)="makeCopy()"
+            >
+              {{ "makeACopy" | i18n }}
+            </button>
+          } @else {
+            <div>{{ "sendWillExpireOnDeletionDate" | i18n }}</div>
+          }
+        </bit-callout>
+      }
+      <tools-send-form
+        formId="sendForm"
+        [config]="config"
+        (onSendCreated)="onSendCreated($event)"
+        (onSendUpdated)="onSendUpdated($event)"
+        (openPasswordGenerator)="openGenerator()"
+        [editing]="editing()"
+        [submitBtn]="submitBtn()"
+      >
+      </tools-send-form>
+    </div>
   </span>
 
   <ng-container bitDialogFooter>
-    <button bitButton type="submit" form="sendForm" buttonType="primary" #submitBtn>
-      {{ "save" | i18n }}
-    </button>
-    <button bitButton type="button" buttonType="secondary" bitDialogClose>
-      {{ "cancel" | i18n }}
-    </button>
-    <div class="tw-ml-auto">
+    @if (showGenerator()) {
       <button
-        *ngIf="config?.mode !== 'add'"
         type="button"
-        buttonType="danger"
-        slot="end"
-        bitIconButton="bwi-trash"
-        [bitAction]="deleteSend"
-        label="{{ 'delete' | i18n }}"
-      ></button>
-    </div>
+        bitButton
+        buttonType="primary"
+        (click)="useGeneratedPassword()"
+        [disabled]="!(generatorButtonLabel() && generatedValue())"
+      >
+        {{ generatorButtonLabel() }}
+      </button>
+      <button bitButton type="button" buttonType="secondary" (click)="closeGenerator()">
+        {{ "cancel" | i18n }}
+      </button>
+    } @else {
+      @if (disableForm) {
+        @if (showCopyButton()) {
+          <button type="button" bitButton buttonType="primary" (click)="makeCopy()">
+            {{ "makeACopy" | i18n }}
+          </button>
+        } @else {
+          <button bitButton type="button" buttonType="danger" (click)="deleteSend()">
+            {{ "delete" | i18n }}
+          </button>
+        }
+      } @else {
+        @if (editing()) {
+          <button bitButton type="submit" form="sendForm" buttonType="primary" #submitBtn>
+            {{ "save" | i18n }}
+          </button>
+          <button bitButton type="button" buttonType="secondary" (click)="cancelEditSend()">
+            {{ "cancel" | i18n }}
+          </button>
+        } @else {
+          <button bitButton type="button" buttonType="secondary" (click)="editSend()">
+            {{ "edit" | i18n }}
+          </button>
+        }
+      }
+      @if (showTrashIconButton()) {
+        <div class="tw-ml-auto">
+          <button
+            type="button"
+            buttonType="dangerGhost"
+            bitIconButton="bwi-trash"
+            [bitAction]="deleteSend"
+            label="{{ 'delete' | i18n }}"
+          ></button>
+        </div>
+      }
+    }
   </ng-container>
 </bit-dialog>

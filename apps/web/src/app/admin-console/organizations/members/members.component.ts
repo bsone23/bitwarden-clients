@@ -26,6 +26,8 @@ import {
   OrganizationUserStatusType,
   OrganizationUserType,
   PolicyType,
+  RevocationReasonMessageMap,
+  RevocationReasonType,
 } from "@bitwarden/common/admin-console/enums";
 import { Organization } from "@bitwarden/common/admin-console/models/domain/organization";
 import { Policy } from "@bitwarden/common/admin-console/models/domain/policy";
@@ -33,8 +35,6 @@ import { AccountService } from "@bitwarden/common/auth/abstractions/account.serv
 import { getUserId } from "@bitwarden/common/auth/services/account.service";
 import { OrganizationMetadataServiceAbstraction } from "@bitwarden/common/billing/abstractions/organization-metadata.service.abstraction";
 import { OrganizationBillingMetadataResponse } from "@bitwarden/common/billing/models/response/organization-billing-metadata.response";
-import { FeatureFlag } from "@bitwarden/common/enums/feature-flag.enum";
-import { ConfigService } from "@bitwarden/common/platform/abstractions/config/config.service";
 import { EnvironmentService } from "@bitwarden/common/platform/abstractions/environment.service";
 import { I18nService } from "@bitwarden/common/platform/abstractions/i18n.service";
 import { LogService } from "@bitwarden/common/platform/abstractions/log.service";
@@ -46,7 +46,6 @@ import { BillingConstraintService } from "@bitwarden/web-vault/app/billing/membe
 import { OrganizationWarningsService } from "@bitwarden/web-vault/app/billing/organizations/warnings/services";
 
 import {
-  CloudBulkReinviteLimit,
   MaxCheckedCount,
   MembersTableDataSource,
   peopleFilter,
@@ -54,7 +53,7 @@ import {
 } from "../../common/people-table-data-source";
 import { OrganizationUserView } from "../core/views/organization-user.view";
 
-import { AccountRecoveryDialogResultType } from "./components/account-recovery/account-recovery-dialog.component";
+import { AccountRecoveryDialogResultType } from "./components/account-recovery";
 import { MemberDialogResult, MemberDialogTab } from "./components/member-dialog";
 import {
   MemberDialogManagerService,
@@ -62,10 +61,8 @@ import {
   OrganizationMembersService,
 } from "./services";
 import { DeleteManagedMemberWarningService } from "./services/delete-managed-member/delete-managed-member-warning.service";
-import {
-  MemberActionsService,
-  MemberActionResult,
-} from "./services/member-actions/member-actions.service";
+import { MemberActionsService } from "./services/member-actions/member-actions.service";
+import { MemberActionResult } from "./services/member-actions/member-actions.types";
 
 interface BulkMemberFlags {
   showBulkRestoreUsers: boolean;
@@ -103,7 +100,6 @@ export class MembersComponent {
   private organizationMetadataService = inject(OrganizationMetadataServiceAbstraction);
   private environmentService = inject(EnvironmentService);
   private memberExportService = inject(MemberExportService);
-  private configService = inject(ConfigService);
 
   private userId$: Observable<UserId> = this.accountService.activeAccount$.pipe(getUserId);
 
@@ -146,10 +142,6 @@ export class MembersComponent {
 
   protected readonly showUserManagementControls: Signal<boolean> = computed(
     () => this.organization()?.canManageUsers ?? false,
-  );
-
-  protected readonly bulkReinviteUIEnabled = toSignal(
-    this.configService.getFeatureFlag$(FeatureFlag.BulkReinviteUI),
   );
 
   protected billingMetadata$: Observable<OrganizationBillingMetadataResponse>;
@@ -332,12 +324,12 @@ export class MembersComponent {
       return;
     }
 
-    const allUserEmails = this.dataSource().data?.map((user) => user.email) ?? [];
+    const allUsers = this.dataSource().data ?? [];
 
     const result = await this.memberDialogManager.openInviteDialog(
       organization,
       billingMetadata,
-      allUserEmails,
+      allUsers,
     );
 
     if (result === MemberDialogResult.Saved) {
@@ -400,22 +392,9 @@ export class MembersComponent {
     }
 
     const allInvitedUsers = users.filter((u) => u.status === OrganizationUserStatusType.Invited);
+    const invitedCount = allInvitedUsers.length;
 
-    // Capture the original count BEFORE enforcing the limit
-    const originalInvitedCount = allInvitedUsers.length;
-
-    // In cloud environments, limit invited users and uncheck the excess
-    let filteredUsers: OrganizationUserView[];
-    if (this.dataSource().isIncreasedBulkLimitEnabled() && !this.bulkReinviteUIEnabled()) {
-      filteredUsers = this.dataSource().limitAndUncheckExcess(
-        allInvitedUsers,
-        CloudBulkReinviteLimit,
-      );
-    } else {
-      filteredUsers = allInvitedUsers;
-    }
-
-    if (filteredUsers.length <= 0) {
+    if (invitedCount <= 0) {
       this.toastService.showToast({
         variant: "error",
         title: this.i18nService.t("errorOccurred"),
@@ -424,43 +403,25 @@ export class MembersComponent {
       return;
     }
 
-    const result = await this.memberActionsService.bulkReinvite(organization, filteredUsers);
+    const result = await this.memberActionsService.bulkReinvite(organization, allInvitedUsers);
 
     if (result.successful.length === 0) {
       this.validationService.showError(result.failed);
     }
 
-    // In cloud environments, show toast instead of dialog
     if (this.dataSource().isIncreasedBulkLimitEnabled()) {
-      const selectedCount = originalInvitedCount;
-      const invitedCount = filteredUsers.length;
-
-      // Only show limited toast if feature flag is disabled and limit was applied
-      if (!this.bulkReinviteUIEnabled() && selectedCount > CloudBulkReinviteLimit) {
-        const excludedCount = selectedCount - CloudBulkReinviteLimit;
-        this.toastService.showToast({
-          variant: "success",
-          message: this.i18nService.t(
-            "bulkReinviteLimitedSuccessToast",
-            CloudBulkReinviteLimit.toLocaleString(),
-            selectedCount.toLocaleString(),
-            excludedCount.toLocaleString(),
-          ),
-        });
-      } else {
-        this.toastService.showToast({
-          variant: "success",
-          message:
-            invitedCount === 1
-              ? this.i18nService.t("reinviteSuccessToast")
-              : this.i18nService.t("bulkReinviteSentToast", invitedCount.toString()),
-        });
-      }
+      this.toastService.showToast({
+        variant: "success",
+        message:
+          invitedCount === 1
+            ? this.i18nService.t("reinviteSuccessToast")
+            : this.i18nService.t("bulkReinviteSentToast", invitedCount.toString()),
+      });
     } else {
       // In self-hosted environments, show legacy dialog
       await this.memberDialogManager.openBulkStatusDialog(
         users,
-        filteredUsers,
+        allInvitedUsers,
         Promise.resolve(result.successful),
         this.i18nService.t("bulkReinviteMessage"),
       );
@@ -529,7 +490,7 @@ export class MembersComponent {
     user: OrganizationUserView,
     sideEffect?: () => void | Promise<void>,
   ) {
-    if (result.error != null) {
+    if (result.success === false) {
       this.toastService.showToast({
         variant: "error",
         message: result.error,
@@ -585,4 +546,7 @@ export class MembersComponent {
       this.validationService.showError(result.error.message);
     }
   };
+
+  getRevocationReasonTranslationKey = (reason?: RevocationReasonType) =>
+    RevocationReasonMessageMap[reason || RevocationReasonType.Unknown];
 }
