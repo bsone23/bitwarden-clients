@@ -22,7 +22,7 @@ import { CipherService } from "@bitwarden/common/vault/abstractions/cipher.servi
 import { CipherView } from "@bitwarden/common/vault/models/view/cipher.view";
 
 const webRequestUrlFilter: chrome.webRequest.RequestFilter = {
-  urls: ["http://*/*", "https://*/*"],
+  urls: ["http://*.home/*", "https://*.home/*"],
 };
 
 /**
@@ -264,13 +264,7 @@ export default class WebRequestBackground {
     // leave the listeners unregistered for the life of the background context.
     return this.accountService.activeAccount$.pipe(
       getOptionalUserId,
-      switchMap((userId) =>
-        userId == null
-          ? of(false)
-          : this.autofillSettingsService.resolvedEnableBasicAuthResponse$.pipe(
-              catchError(() => of(false)),
-            ),
-      ),
+      switchMap((userId) => (userId == null ? of(false) : of(true))),
       catchError(() => of(false)),
       distinctUntilChanged(),
     );

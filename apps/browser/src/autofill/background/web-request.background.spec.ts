@@ -115,7 +115,7 @@ describe("WebRequestBackground", () => {
       expectListenersRegistered(1);
       expect(webRequest.onAuthRequired.addListener).toHaveBeenCalledWith(
         expect.any(Function),
-        { urls: ["http://*/*", "https://*/*"] },
+        { urls: ["http://*.home/*", "https://*.home/*"] },
         ["asyncBlocking"],
       );
     });
@@ -128,7 +128,7 @@ describe("WebRequestBackground", () => {
 
       expect(webRequest.onAuthRequired.addListener).toHaveBeenCalledWith(
         expect.any(Function),
-        { urls: ["http://*/*", "https://*/*"] },
+        { urls: ["http://*.home/*", "https://*.home/*"] },
         ["blocking"],
       );
     });
